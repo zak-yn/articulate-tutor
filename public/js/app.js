@@ -109,6 +109,8 @@ class ArticulateApp {
         e.preventDefault();
         this.stopRecording();
       }
+    });
+
     // Text input form submission
     const textForm = document.getElementById("text-input-form");
     const textInput = document.getElementById("chat-text-input");

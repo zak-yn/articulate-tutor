@@ -85,9 +85,14 @@ AI English Tutor/
 ---
 
 ## 7. Changelog
+- **2026-10-04**: Fixed syntax error in client event handler & verified active Azure status.
+  - Closed missing `});` in `keyup` listener within `public/js/app.js` that caused initial script load failure.
+  - Verified local and Render `/api/status` confirming Azure AI Speech & Gemini 3.5 Flash Lite both fully active.
+  - Autonomous Playwright sensory check validated full scenario rendering and "Azure & Gemini Active" badge.
 - **2026-10-03**: Integrated & configured Azure AI Speech F0 service.
   - Added `microsoft-cognitiveservices-speech-sdk` to backend dependencies.
   - Activated Azure Pronunciation Assessment API in `japaneast` for sub-word phoneme scoring and prosody diagnostics.
+  - Added Azure Studio Neural Voice (`en-US-AvaMultilingualNeural`) in `server/tts.js` for ultra-natural human cadence.
   - Synchronized Azure credentials across local `.env` and Render production service.
 - **2026-10-02**: Initial architecture & production deployment.
   - Deployed GitHub repository: `zak-yn/articulate-tutor`.

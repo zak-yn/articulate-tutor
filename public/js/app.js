@@ -266,8 +266,11 @@ class ArticulateApp {
     // Bind replay buttons
     ws.querySelectorAll(".btn-replay-voice").forEach(btn => {
       btn.addEventListener("click", () => {
-        const text = btn.getAttribute("data-text");
-        this.player.speak(text);
+        const turnIdx = parseInt(btn.getAttribute("data-turn-idx"), 10);
+        const turn = this.history[turnIdx];
+        if (turn) {
+          this.player.speak(turn.spoken_response, { audioBase64: turn.audio_base64 });
+        }
       });
     });
 
@@ -325,8 +328,8 @@ class ArticulateApp {
     return `
       <div class="tutor-turn">
         <div class="tutor-speech-header">
-          <span class="tutor-label">${Icons.shieldCheck("w-3.5 h-3.5")} Articulate Tutor</span>
-          <button class="btn-replay-voice" data-text="${encodeURIComponent(turn.spoken_response)}" title="Replay voice">
+          <span class="tutor-label">${Icons.shieldCheck("w-3.5 h-3.5")} Articulate Tutor <span style="font-size: 10px; color: var(--accent-emerald); font-weight: normal; margin-left: 4px;">• Studio Neural Voice</span></span>
+          <button class="btn-replay-voice" data-turn-idx="${idx}" title="Replay voice">
             ${Icons.volume("w-4 h-4")}
           </button>
         </div>
@@ -469,19 +472,20 @@ class ArticulateApp {
       this.updateVaultBadge();
     }
 
-    // 3. Add Tutor Turn to History
+    // 3. Add Tutor Turn to History (including synthesized studio neural audio)
     const tutorTurn = data.tutor_turn || {};
     this.history.push({
       role: "tutor",
       spoken_response: tutorTurn.spoken_response,
       corrections: tutorTurn.corrections || [],
-      scaffolding_hints: tutorTurn.scaffolding_hints || []
+      scaffolding_hints: tutorTurn.scaffolding_hints || [],
+      audio_base64: data.audio_base64
     });
 
-    // 4. Update UI & Speak
+    // 4. Update UI & Speak with Azure Studio Neural Voice
     this.renderTimeline();
     this.renderScaffolding(tutorTurn.scaffolding_hints);
-    this.player.speak(tutorTurn.spoken_response);
+    this.player.speak(tutorTurn.spoken_response, { audioBase64: data.audio_base64 });
   }
 
   openPhonemeModal(wordObj) {

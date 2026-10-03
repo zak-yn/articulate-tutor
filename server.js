@@ -8,6 +8,7 @@ import multer from "multer";
 import { generateTutorTurn, transcribeAudioWithGemini } from "./server/gemini.js";
 import { evaluatePronunciation } from "./server/phonetics.js";
 import { assessWithAzureSpeech } from "./server/azureSpeech.js";
+import { synthesizeNeuralSpeech } from "./server/tts.js";
 import { MINIMAL_PAIRS, SPEAKING_DRILLS, ROLEPLAY_SCENARIOS } from "./server/scenarios.js";
 
 dotenv.config();
@@ -155,10 +156,18 @@ app.post("/api/turn", upload.single("audio"), async (req, res) => {
       dueWords
     });
 
+    // 3. High-Fidelity Studio Neural Voice Synthesis (Azure Ava / Jenny)
+    let audioBase64 = null;
+    if (tutorTurn?.spoken_response) {
+      const voice = req.body.voice || "en-US-AvaMultilingualNeural";
+      audioBase64 = await synthesizeNeuralSpeech(tutorTurn.spoken_response, voice);
+    }
+
     res.json({
       user_transcript: userTranscript,
       pronunciation: pronunciationData,
-      tutor_turn: tutorTurn
+      tutor_turn: tutorTurn,
+      audio_base64: audioBase64
     });
   } catch (err) {
     console.error("Turn processing error:", err);
@@ -166,6 +175,21 @@ app.post("/api/turn", upload.single("audio"), async (req, res) => {
       error: "Internal server error during turn processing",
       details: err.message
     });
+  }
+});
+
+// Standalone Neural Voice Synthesizer API
+app.post("/api/tts", async (req, res) => {
+  try {
+    const text = req.body.text || "";
+    const voice = req.body.voice || "en-US-AvaMultilingualNeural";
+    const audioDataUrl = await synthesizeNeuralSpeech(text, voice);
+    if (!audioDataUrl) {
+      return res.status(500).json({ error: "Failed to synthesize neural speech" });
+    }
+    res.json({ audio_base64: audioDataUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

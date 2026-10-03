@@ -10,13 +10,13 @@ export class AudioRecorder {
     this.isRecording = false;
     this.stream = null;
     this.speechRecognition = null;
-    this.liveTranscript = "";
+    this.currentTranscript = "";
   }
 
   async start({ onLiveTranscript, onVolumeChange } = {}) {
     if (this.isRecording) return;
 
-    this.liveTranscript = "";
+    this.currentTranscript = "";
     this.audioChunks = [];
 
     // 1. Acquire microphone stream
@@ -60,22 +60,21 @@ export class AudioRecorder {
         this.speechRecognition.continuous = true;
         this.speechRecognition.interimResults = true;
         this.speechRecognition.lang = "en-US";
+        this.speechRecognition.maxAlternatives = 1;
 
         this.speechRecognition.onresult = (event) => {
-          let interim = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              this.liveTranscript += event.results[i][0].transcript + " ";
-            } else {
-              interim += event.results[i][0].transcript;
+          let text = "";
+          for (let i = 0; i < event.results.length; ++i) {
+            if (event.results[i] && event.results[i][0]) {
+              text += event.results[i][0].transcript + " ";
             }
           }
-          const full = (this.liveTranscript + interim).trim();
-          if (onLiveTranscript) onLiveTranscript(full);
+          this.currentTranscript = text.trim();
+          if (onLiveTranscript) onLiveTranscript(this.currentTranscript);
         };
 
         this.speechRecognition.onerror = (e) => {
-          // Graceful fallback: silent ignore, server ASR will handle
+          console.warn("Browser SpeechRecognition notice:", e.error);
         };
 
         this.speechRecognition.start();
@@ -115,6 +114,9 @@ export class AudioRecorder {
       } catch (e) {}
     }
 
+    // Short 120ms buffer to allow last audio packets and recognition events to flush
+    await new Promise(r => setTimeout(r, 120));
+
     return new Promise((resolve) => {
       this.mediaRecorder.onstop = () => {
         const audioBlob = new Blob(this.audioChunks, { type: this.mediaRecorder.mimeType });
@@ -131,11 +133,13 @@ export class AudioRecorder {
         this.isRecording = false;
         resolve({
           blob: audioBlob,
-          transcript: this.liveTranscript.trim()
+          transcript: (this.currentTranscript || "").trim()
         });
       };
 
-      this.mediaRecorder.stop();
+      if (this.mediaRecorder.state !== "inactive") {
+        this.mediaRecorder.stop();
+      }
     });
   }
 }

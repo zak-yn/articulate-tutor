@@ -109,7 +109,19 @@ class ArticulateApp {
         e.preventDefault();
         this.stopRecording();
       }
-    });
+    // Text input form submission
+    const textForm = document.getElementById("text-input-form");
+    const textInput = document.getElementById("chat-text-input");
+    if (textForm && textInput) {
+      textForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = textInput.value.trim();
+        if (text && !this.isLoading) {
+          textInput.value = "";
+          this.processTurn(null, text);
+        }
+      });
+    }
   }
 
   async fetchStatusAndCatalog() {
@@ -334,7 +346,11 @@ class ArticulateApp {
       chip.className = "scaffold-chip";
       chip.textContent = hint;
       chip.onclick = () => {
-        // Speak or paste the scaffold
+        const input = document.getElementById("chat-text-input");
+        if (input) {
+          input.value = hint;
+          input.focus();
+        }
         this.player.speak(hint);
       };
       container.appendChild(chip);

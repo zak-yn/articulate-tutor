@@ -45,6 +45,47 @@ const CANDIDATE_MODELS = [
 ];
 
 /**
+ * Directly transcribes audio using Gemini Flash multimodal capabilities
+ */
+export async function transcribeAudioWithGemini(audioBuffer, mimeType = "audio/webm") {
+  const apiKey = process.env.GEMINI_API_KEY || "";
+  if (!apiKey || !audioBuffer || audioBuffer.length < 500) {
+    return "";
+  }
+
+  try {
+    const cleanMime = mimeType.split(";")[0] || "audio/webm";
+    const base64Data = audioBuffer.toString("base64");
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType: cleanMime, data: base64Data } },
+              { text: "Transcribe the English speech in this audio clip verbatim. Output ONLY the recognized text. If the audio is silent or unintelligible, output nothing." }
+            ]
+          }
+        ]
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      return text.trim();
+    }
+  } catch (err) {
+    console.warn("Gemini audio transcription fallback failed:", err.message);
+  }
+  return "";
+}
+
+/**
  * Generates an adaptive tutor turn using Google Gemini API
  */
 export async function generateTutorTurn({

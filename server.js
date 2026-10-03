@@ -5,7 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
 
-import { generateTutorTurn } from "./server/gemini.js";
+import { generateTutorTurn, transcribeAudioWithGemini } from "./server/gemini.js";
 import { evaluatePronunciation } from "./server/phonetics.js";
 import { assessWithAzureSpeech } from "./server/azureSpeech.js";
 import { MINIMAL_PAIRS, SPEAKING_DRILLS, ROLEPLAY_SCENARIOS } from "./server/scenarios.js";
@@ -107,28 +107,56 @@ app.post("/api/turn", upload.single("audio"), async (req, res) => {
       dueWords = [];
     }
 
-    // 1. Pronunciation Assessment (Stream B)
+    // 1. Determine spoken transcript with multi-level fallbacks
+    let userTranscript = (transcript || "").trim();
+
+    // If client transcript is empty, attempt Azure Speech Recognition
     let pronunciationData = null;
     if (req.file && req.file.buffer && process.env.AZURE_SPEECH_KEY) {
-      pronunciationData = await assessWithAzureSpeech(req.file.buffer, referenceText || transcript);
+      pronunciationData = await assessWithAzureSpeech(req.file.buffer, referenceText || userTranscript);
+      if (pronunciationData && pronunciationData.recognized_text) {
+        userTranscript = userTranscript || pronunciationData.recognized_text;
+      }
+    }
+
+    // If still empty, attempt direct Gemini multimodal audio transcription
+    if (!userTranscript && req.file && req.file.buffer) {
+      userTranscript = await transcribeAudioWithGemini(req.file.buffer, req.file.mimetype || "audio/webm");
+    }
+
+    // If no speech detected at all (silent audio or no input)
+    if (!userTranscript) {
+      return res.json({
+        user_transcript: "(No speech detected)",
+        pronunciation: null,
+        tutor_turn: {
+          spoken_response: "I didn't quite catch that. Please hold the microphone while speaking, or type your message in the chat box.",
+          corrections: [],
+          scaffolding_hints: [
+            "Let me try speaking again.",
+            "Can you hear me now?",
+            "Let's continue our conversation."
+          ],
+          goal_achieved: false
+        }
+      });
     }
 
     if (!pronunciationData) {
-      pronunciationData = evaluatePronunciation(transcript, referenceText, targetPhoneme);
+      pronunciationData = evaluatePronunciation(userTranscript, referenceText, targetPhoneme);
     }
 
-    // 2. Pedagogical Reasoning via Gemini (Stream A)
-    const effectiveTranscript = transcript || pronunciationData?.recognized_text || "Hello";
+    // 2. Pedagogical Reasoning via Gemini
     const tutorTurn = await generateTutorTurn({
       mode,
       scenario,
-      transcript: effectiveTranscript,
+      transcript: userTranscript,
       history,
       dueWords
     });
 
     res.json({
-      user_transcript: effectiveTranscript,
+      user_transcript: userTranscript,
       pronunciation: pronunciationData,
       tutor_turn: tutorTurn
     });

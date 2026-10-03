@@ -528,6 +528,57 @@ body {
   font-weight: 500;
 }
 
+/* Quick Text Input Form */
+.text-input-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 460px;
+  margin-top: 2px;
+}
+
+.chat-text-input {
+  flex: 1;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.chat-text-input:focus {
+  border-color: var(--accent-amber);
+}
+
+.chat-text-input::placeholder {
+  color: var(--text-dim);
+}
+
+.btn-submit-text {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-muted);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-submit-text:hover {
+  background: var(--accent-amber);
+  color: #090B0E;
+  border-color: var(--accent-amber);
+}
+
 /* Modal: IPA Breakdown & Articulatory Guide */
 .modal-overlay {
   position: fixed;

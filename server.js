@@ -42,6 +42,7 @@ app.get("/api/status", (req, res) => {
     gemini_configured: !!process.env.GEMINI_API_KEY,
     gemini_model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
     azure_speech_configured: !!process.env.AZURE_SPEECH_KEY,
+    azure_speech_region: process.env.AZURE_SPEECH_REGION || "japaneast",
     modes: ["gym", "drill", "roleplay"],
     timestamp: new Date().toISOString()
   });

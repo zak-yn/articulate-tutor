@@ -85,6 +85,10 @@ AI English Tutor/
 ---
 
 ## 7. Changelog
+- **2026-10-03**: Integrated & configured Azure AI Speech F0 service.
+  - Added `microsoft-cognitiveservices-speech-sdk` to backend dependencies.
+  - Activated Azure Pronunciation Assessment API in `japaneast` for sub-word phoneme scoring and prosody diagnostics.
+  - Synchronized Azure credentials across local `.env` and Render production service.
 - **2026-10-02**: Initial architecture & production deployment.
   - Deployed GitHub repository: `zak-yn/articulate-tutor`.
   - Deployed Render Web Service: `articulate-tutor` ([https://articulate-tutor.onrender.com](https://articulate-tutor.onrender.com)).

@@ -1,20 +1,20 @@
 // Azure Speech SDK Pronunciation Assessment Adapter (Optional cloud enhancement)
 
-const AZURE_KEY = process.env.AZURE_SPEECH_KEY || "";
-const AZURE_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
-
 export async function assessWithAzureSpeech(audioBuffer, referenceText = "") {
-  if (!AZURE_KEY) {
+  const azureKey = process.env.AZURE_SPEECH_KEY || "";
+  const azureRegion = process.env.AZURE_SPEECH_REGION || "japaneast";
+
+  if (!azureKey) {
     return null; // Gracefully fallback to internal phonetics engine
   }
 
   try {
-    // Dynamic import to avoid crash if native SDK is not present
-    const speechsdk = await import("microsoft-cognitiveservices-speech-sdk");
+    const mod = await import("microsoft-cognitiveservices-speech-sdk");
+    const speechsdk = mod.default || mod;
 
     return new Promise((resolve) => {
       try {
-        const speechConfig = speechsdk.SpeechConfig.fromSubscription(AZURE_KEY, AZURE_REGION);
+        const speechConfig = speechsdk.SpeechConfig.fromSubscription(azureKey, azureRegion);
         const pushStream = speechsdk.AudioInputStream.createPushStream();
         pushStream.write(audioBuffer);
         pushStream.close();

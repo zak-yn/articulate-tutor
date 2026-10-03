@@ -114,15 +114,31 @@ class ArticulateApp {
 
   async fetchStatusAndCatalog() {
     try {
-      const res = await fetch("/api/scenarios");
-      if (res.ok) {
-        this.catalog = await res.json();
+      const [scenRes, statusRes] = await Promise.all([
+        fetch("/api/scenarios"),
+        fetch("/api/status")
+      ]);
+      if (scenRes.ok) {
+        this.catalog = await scenRes.json();
         this.activeScenario = this.catalog.roleplayScenarios[0] || null;
         this.activeGymPair = this.catalog.minimalPairs[0] || null;
         this.activeDrillPrompt = this.catalog.speakingDrills[0]?.prompts[0] || null;
       }
+      if (statusRes.ok) {
+        const stat = await statusRes.json();
+        const badgeText = document.getElementById("system-status-text");
+        if (badgeText) {
+          if (stat.azure_speech_configured && stat.gemini_configured) {
+            badgeText.textContent = "Azure & Gemini Active";
+          } else if (stat.azure_speech_configured) {
+            badgeText.textContent = "Azure Speech Active";
+          } else {
+            badgeText.textContent = "Gemini Active";
+          }
+        }
+      }
     } catch (e) {
-      console.warn("Failed to load catalog:", e);
+      console.warn("Failed to load catalog or status:", e);
     }
   }
 

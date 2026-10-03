@@ -1,19 +1,22 @@
 // Google Gemini Pedagogical Tutor Engine
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+import dotenv from "dotenv";
+dotenv.config();
 
 const SYSTEM_PROMPT = `You are Articulate, an elite, adaptive AI English Tutor and Executive Speech Coach.
-You operate across three distinct pedagogical modes:
-1. 'roleplay': Realistic workplace, business, or daily life simulations. Do not lecture. Mirror natural native conversational pace (1 to 3 punchy sentences max). Keep the exchange dynamic and reciprocal.
+You engage in natural, flowing conversational English across three distinct pedagogical modes:
+1. 'roleplay': Realistic workplace, business, or daily life simulations. Act as the specified persona (e.g. interviewer, CTO, colleague). Respond directly and naturally to what the student ACTUALLY said.
+   - If the student just greets (e.g. "hello", "hi"), warmly acknowledge it and invite them to share their perspective or story.
+   - If the student answers a question, demonstrate active listening by commenting on a specific detail they mentioned, then ask a natural follow-up question.
+   - Do NOT talk in rigid robotic templates or repeat the scenario title verbatim.
+   - Keep spoken_response concise, conversational, and natural (1 to 3 punchy sentences max) so it sounds human when synthesized to speech.
 2. 'drill': High-cadence speaking drills (e.g. passive transformation, workplace softening, hesitation markers). Provide direct feedback on the student's attempt and offer the next immediate challenge.
 3. 'gym': Accent and pronunciation coach. Focus on phonemic accuracy, minimal pairs, and articulatory mechanics (tongue and lip placement).
 
 CRITICAL INSTRUCTIONS:
 - You must always respond strictly in valid JSON format matching the schema below.
-- Keep 'spoken_response' concise, conversational, and natural (1 to 3 sentences max) so it sounds human when synthesized to speech.
-- In 'corrections', detect missing prepositions, wrong tenses, unnatural collocations, or stiff phrasing without breaking conversational immersion.
-- Suggest 2 to 3 dynamic 'scaffolding_hints' (sentence starters showing how the student can reply effectively).
+- Keep 'spoken_response' natural and conversational (1 to 3 sentences max).
+- In 'corrections', detect missing prepositions, wrong tenses, unnatural collocations, or stiff phrasing without breaking conversational immersion. If the student's sentence was already natural, 'corrections' should be an empty array [].
+- Suggest 2 to 3 dynamic 'scaffolding_hints' (contextual sentence starters showing how the student can reply effectively).
 - If 'due_words' are provided, subtly steer the conversation to give the student an opportunity to practice using them.
 
 OUTPUT JSON SCHEMA:
@@ -35,21 +38,26 @@ OUTPUT JSON SCHEMA:
   "goal_achieved": false
 }`;
 
+const CANDIDATE_MODELS = [
+  process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-3.5-flash-lite"
+];
+
 /**
  * Generates an adaptive tutor turn using Google Gemini API
  */
 export async function generateTutorTurn({
   mode = "roleplay",
-  scenario = "Job Interview at a Tech Company",
+  scenario = "Senior Engineering Behavioral Interview",
   transcript = "",
   history = [],
   dueWords = []
 }) {
-  if (!GEMINI_API_KEY) {
+  const apiKey = process.env.GEMINI_API_KEY || "";
+  if (!apiKey) {
     return generateFallbackTurn(mode, scenario, transcript, dueWords);
   }
-
-  const promptMessages = [];
 
   // Build context
   let contextDirective = `Active Mode: ${mode}. Active Scenario: ${scenario}.`;
@@ -65,7 +73,7 @@ export async function generateTutorTurn({
 
   const userTurn = {
     role: "user",
-    parts: [{ text: `[System Context: ${contextDirective}]\nStudent said: "${transcript}"` }]
+    parts: [{ text: `[Context: ${contextDirective}]\nStudent said: "${transcript}"` }]
   };
 
   const contents = [
@@ -75,57 +83,71 @@ export async function generateTutorTurn({
     userTurn
   ];
 
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 800,
-          responseMimeType: "application/json"
-        }
-      })
-    });
+  // Try candidate models in order of speed and stability
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 800,
+            responseMimeType: "application/json"
+          }
+        })
+      });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.warn("Gemini API error:", res.status, errText);
-      return generateFallbackTurn(mode, scenario, transcript, dueWords);
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`Gemini model ${model} returned status ${res.status}:`, errText);
+        continue; // Try next candidate model
+      }
+
+      const data = await res.json();
+      const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!candidate) continue;
+
+      const parsed = JSON.parse(candidate);
+      return parsed;
+    } catch (err) {
+      console.warn(`Gemini invocation failed on ${model}:`, err.message);
     }
-
-    const data = await res.json();
-    const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!candidate) {
-      return generateFallbackTurn(mode, scenario, transcript, dueWords);
-    }
-
-    const parsed = JSON.parse(candidate);
-    return parsed;
-  } catch (err) {
-    console.error("Gemini invocation failed, falling back to local heuristic:", err.message);
-    return generateFallbackTurn(mode, scenario, transcript, dueWords);
   }
+
+  return generateFallbackTurn(mode, scenario, transcript, dueWords);
 }
 
 /**
- * Intelligent deterministic fallback when API key is unavailable or during network disconnects
+ * Deterministic fallback if all cloud models are unreachable
  */
 function generateFallbackTurn(mode, scenario, transcript, dueWords = []) {
-  const clean = (transcript || "").toLowerCase();
+  const clean = (transcript || "").toLowerCase().trim();
+
+  if (clean === "hello" || clean === "hi" || clean === "hey") {
+    return {
+      spoken_response: "Hello! Great to connect with you. Whenever you're ready, let me know what you'd like to focus on today.",
+      corrections: [],
+      scaffolding_hints: [
+        "I'd like to practice explaining a complex system.",
+        "Could you ask me a behavioral question about conflict resolution?",
+        "Let's simulate a salary negotiation."
+      ],
+      cefr_assessment: {
+        level: "B2",
+        strengths: "Clear greeting and initiative",
+        focus_area: "Expanding into complete narrative statements"
+      },
+      goal_achieved: false
+    };
+  }
 
   if (mode === "gym") {
     return {
       spoken_response: "Good attempt! Notice how your tongue position changes between these sounds. Let's repeat the target word with extra breath support.",
-      corrections: clean.includes("sink") || clean.includes("think") ? [
-        {
-          original: "sink",
-          improved: "think",
-          explanation: "Ensure the tongue tip peeks slightly between your teeth for the unvoiced /θ/ rather than retracting behind teeth for /s/."
-        }
-      ] : [],
+      corrections: [],
       scaffolding_hints: [
         "Let me try the minimal pair one more time.",
         "Could you exaggerate the tongue position for me?",
@@ -140,49 +162,18 @@ function generateFallbackTurn(mode, scenario, transcript, dueWords = []) {
     };
   }
 
-  if (mode === "drill") {
-    return {
-      spoken_response: "Excellent cadence! That sounded much more diplomatic. Now try rephrasing with an introductory hedge like 'From our perspective'.",
-      corrections: [
-        {
-          original: "We cannot do this now",
-          improved: "Given our current bandwidth, it might be challenging to prioritize this immediately.",
-          explanation: "Softens a direct refusal while maintaining clear executive boundaries."
-        }
-      ],
-      scaffolding_hints: [
-        "From our perspective, bandwidth is constrained right now.",
-        "I was wondering if we could defer this to next sprint?",
-        "Could we explore a staged compromise instead?"
-      ],
-      cefr_assessment: {
-        level: "B2",
-        strengths: "Immediate stimulus response",
-        focus_area: "Executive softening markers"
-      },
-      goal_achieved: false
-    };
-  }
-
-  // Default Roleplay
   return {
-    spoken_response: `That's a very compelling point. When tackling ${scenario}, how do you usually measure the long-term impact on your key metrics?`,
-    corrections: clean.includes("i have") && clean.includes("years") ? [
-      {
-        original: "I have 5 years experience",
-        improved: "I have 5 years of experience (or: I bring 5 years of domain expertise)",
-        explanation: "In natural English, use 'years of experience' or strengthen the verb with 'bring / offer'."
-      }
-    ] : [],
+    spoken_response: `That's very interesting. Could you elaborate on what specific challenges you encountered while working through that?`,
+    corrections: [],
     scaffolding_hints: [
-      "We closely track latency, customer churn, and delivery velocity.",
-      "In my experience, the biggest risk is over-engineering too early.",
-      "We run bi-weekly retrospectives to recalibrate our goals."
+      "The primary bottleneck was database connection pooling under high load.",
+      "We had to align three cross-functional engineering squads.",
+      "Our main concern was maintaining zero data loss during failover."
     ],
     cefr_assessment: {
       level: "B2",
-      strengths: "Natural turn-taking and conversational engagement",
-      focus_area: "Prepositional accuracy in technical explanations"
+      strengths: "Natural conversational engagement",
+      focus_area: "Technical precision and vocabulary depth"
     },
     goal_achieved: false
   };

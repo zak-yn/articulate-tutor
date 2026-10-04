@@ -1,4 +1,4 @@
-const CACHE_NAME = "articulate-v6";
+const CACHE_NAME = "articulate-v7";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",

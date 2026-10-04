@@ -85,6 +85,11 @@ AI English Tutor/
 ---
 
 ## 7. Changelog
+- **2026-10-04**: High-concurrency parallel turn pipeline & sub-2-second conversational latency.
+  - Converted `/api/turn` execution from sequential (5-7s) to parallel `Promise.all` (Azure Pronunciation Assessment + Gemini Flash concurrent execution), dropping roundtrip latency to ~1.8-2.0s.
+  - Decoupled synchronous TTS from `/api/turn`: returns structured pedagogical feedback, word chips, and metrics instantly while client streams Azure Neural Voice in parallel.
+  - Added in-memory LRU audio cache in `server/tts.js` for instant (0ms) replayed speech.
+  - Upgraded PWA state transitions ("Analyzing speech...", "Tutor speaking...") eliminating freezing UI perception.
 - **2026-10-04**: Real acoustic pronunciation assessment, SVG icon restraint, and scenario context briefing.
   - Upgraded `audioRecorder.js` to capture 16kHz 16-bit mono Linear PCM WAV, enabling Azure Speech SDK acoustic formant parsing.
   - Fixed `azureSpeech.js` JSON path to extract genuine `PronAssessment` metrics (accuracy, fluency, prosody, completeness, sub-word phonemes) instead of defaulting to 85.

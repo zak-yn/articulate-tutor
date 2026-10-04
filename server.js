@@ -110,64 +110,78 @@ app.post("/api/turn", upload.single("audio"), async (req, res) => {
 
     // 1. Determine spoken transcript with multi-level fallbacks
     let userTranscript = (transcript || "").trim();
-
-    // If client transcript is empty, attempt Azure Speech Recognition
     let pronunciationData = null;
-    if (req.file && req.file.buffer && process.env.AZURE_SPEECH_KEY) {
-      pronunciationData = await assessWithAzureSpeech(req.file.buffer, referenceText || userTranscript);
-      if (pronunciationData && pronunciationData.recognized_text) {
-        userTranscript = userTranscript || pronunciationData.recognized_text;
-      }
-    }
+    let tutorTurn = null;
 
-    // If still empty, attempt direct Gemini multimodal audio transcription
-    if (!userTranscript && req.file && req.file.buffer) {
-      userTranscript = await transcribeAudioWithGemini(req.file.buffer, req.file.mimetype || "audio/webm");
-    }
+    // Fast-path: When userTranscript is already provided by real-time client ASR or typed input
+    if (userTranscript) {
+      const hasAudio = req.file && req.file.buffer && process.env.AZURE_SPEECH_KEY;
+      const [azurePron, geminiTutor] = await Promise.all([
+        hasAudio
+          ? assessWithAzureSpeech(req.file.buffer, referenceText || userTranscript).catch(() => null)
+          : Promise.resolve(null),
+        generateTutorTurn({
+          mode,
+          scenario,
+          transcript: userTranscript,
+          history,
+          dueWords
+        })
+      ]);
 
-    // If no speech detected at all (silent audio or no input)
-    if (!userTranscript) {
-      return res.json({
-        user_transcript: "(No speech detected)",
-        pronunciation: null,
-        tutor_turn: {
-          spoken_response: "I didn't quite catch that. Please hold the microphone while speaking, or type your message in the chat box.",
-          corrections: [],
-          scaffolding_hints: [
-            "Let me try speaking again.",
-            "Can you hear me now?",
-            "Let's continue our conversation."
-          ],
-          goal_achieved: false
+      pronunciationData = azurePron || evaluatePronunciation(userTranscript, referenceText, targetPhoneme);
+      tutorTurn = geminiTutor;
+    } else {
+      // Audio-only fallback: Transcribe speech from audio first
+      if (req.file && req.file.buffer && process.env.AZURE_SPEECH_KEY) {
+        pronunciationData = await assessWithAzureSpeech(req.file.buffer, referenceText);
+        if (pronunciationData && pronunciationData.recognized_text) {
+          userTranscript = pronunciationData.recognized_text;
         }
+      }
+
+      if (!userTranscript && req.file && req.file.buffer) {
+        userTranscript = await transcribeAudioWithGemini(req.file.buffer, req.file.mimetype || "audio/wav");
+      }
+
+      if (!userTranscript) {
+        return res.json({
+          user_transcript: "(No speech detected)",
+          pronunciation: null,
+          tutor_turn: {
+            spoken_response: "I didn't quite catch that. Please hold the microphone while speaking, or type your message in the chat box.",
+            corrections: [],
+            scaffolding_hints: [
+              "Let me try speaking again.",
+              "Can you hear me now?",
+              "Let's continue our conversation."
+            ],
+            goal_achieved: false
+          },
+          audio_base64: null
+        });
+      }
+
+      if (!pronunciationData) {
+        pronunciationData = evaluatePronunciation(userTranscript, referenceText, targetPhoneme);
+      }
+
+      tutorTurn = await generateTutorTurn({
+        mode,
+        scenario,
+        transcript: userTranscript,
+        history,
+        dueWords
       });
     }
 
-    if (!pronunciationData) {
-      pronunciationData = evaluatePronunciation(userTranscript, referenceText, targetPhoneme);
-    }
-
-    // 2. Pedagogical Reasoning via Gemini
-    const tutorTurn = await generateTutorTurn({
-      mode,
-      scenario,
-      transcript: userTranscript,
-      history,
-      dueWords
-    });
-
-    // 3. High-Fidelity Studio Neural Voice Synthesis (Azure Ava / Jenny)
-    let audioBase64 = null;
-    if (tutorTurn?.spoken_response) {
-      const voice = req.body.voice || "en-US-AvaMultilingualNeural";
-      audioBase64 = await synthesizeNeuralSpeech(tutorTurn.spoken_response, voice);
-    }
-
+    // High-speed response: Return text, scoring, and recasting immediately.
+    // Client AudioPlayer fetches Neural TTS asynchronously without freezing the UI.
     res.json({
       user_transcript: userTranscript,
       pronunciation: pronunciationData,
       tutor_turn: tutorTurn,
-      audio_base64: audioBase64
+      audio_base64: null
     });
   } catch (err) {
     console.error("Turn processing error:", err);

@@ -430,7 +430,7 @@ class ArticulateApp {
 
     pttBtn.classList.remove("recording");
     pttBtn.classList.add("loading");
-    caption.textContent = "Evaluating pronunciation & cadence...";
+    caption.textContent = "Analyzing speech...";
     this.isLoading = true;
 
     try {
@@ -452,16 +452,18 @@ class ArticulateApp {
     const pttBtn = document.getElementById("btn-ptt");
     const caption = document.getElementById("ptt-caption");
     pttBtn.classList.remove("recording", "loading");
-    caption.textContent = "Tap or Hold Space to Speak";
+    caption.textContent = this.player.isSpeaking ? "Tutor speaking..." : "Tap or Hold Space to Speak";
     this.isLoading = false;
   }
 
   async processTurn(audioBlob, liveTranscript) {
     const dueItems = this.db.getDueItems(4).map(i => i.word);
+    const caption = document.getElementById("ptt-caption");
+    if (caption) caption.textContent = "Coaching your reply...";
 
     const formData = new FormData();
     if (audioBlob) {
-      formData.append("audio", audioBlob, "recording.webm");
+      formData.append("audio", audioBlob, "recording.wav");
     }
     formData.append("transcript", liveTranscript || "");
     formData.append("mode", this.activeMode);
@@ -514,7 +516,16 @@ class ArticulateApp {
     // 4. Update UI & Speak with Azure Studio Neural Voice
     this.renderTimeline();
     this.renderScaffolding(tutorTurn.scaffolding_hints);
-    this.player.speak(tutorTurn.spoken_response, { audioBase64: data.audio_base64 });
+
+    if (tutorTurn.spoken_response) {
+      if (caption) caption.textContent = "Tutor speaking...";
+      this.player.speak(tutorTurn.spoken_response, {
+        audioBase64: data.audio_base64,
+        onEnd: () => {
+          if (caption) caption.textContent = "Tap or Hold Space to Speak";
+        }
+      });
+    }
   }
 
   openPhonemeModal(wordObj) {

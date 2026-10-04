@@ -3,6 +3,26 @@ import { AudioRecorder } from "./audioRecorder.js";
 import { AudioPlayer } from "./audioPlayer.js";
 import { FsrsDatabase } from "./fsrsDb.js";
 
+const DEFAULT_SCENARIO = {
+  id: "specialty_cafe",
+  title: "Artisanal Coffee Roaster & Order Customization",
+  category: "Daily Life & Travel",
+  level: "Intermediate (B1-B2)",
+  persona: "Liam, Head Barista at a specialty roastery in Melbourne",
+  settingJa: "オーストラリア・メルボルンの人気スペシャリティコーヒー店。カウンターでバリスタのLiamと話しながら注文する場面です。",
+  yourRoleJa: "カフェを訪れた旅行者・カスタマー",
+  partnerJa: "Liam（フレンドリーなヘッドバリスタ）",
+  goalJa: "挨拶を交わし、好みのコーヒー（豆の種類やミルクのカスタム）を自然な英語で注文する。",
+  context: "Order a complex specialty pourover and customize your dairy preference while discussing tasting notes.",
+  systemGoal: "Practice natural conversational speed, food ordering nuances, and clarifying questions.",
+  initialGreeting: "Hi there! Welcome into Monolith Coffee. How's your morning going? What can I get brewing for you today?",
+  scaffoldingHints: [
+    "Good morning! I'm doing well, thanks. What do you have on batch brew today?",
+    "Could I get a flat white with oat milk, please?",
+    "I'd love to try a pourover with floral or fruity notes—what do you recommend?"
+  ]
+};
+
 class ArticulateApp {
   constructor() {
     this.recorder = new AudioRecorder();
@@ -11,12 +31,12 @@ class ArticulateApp {
 
     this.activeMode = "roleplay"; // 'roleplay' | 'gym' | 'drill' | 'vault'
     this.catalog = {
-      roleplayScenarios: [],
+      roleplayScenarios: [DEFAULT_SCENARIO],
       speakingDrills: [],
       minimalPairs: []
     };
 
-    this.activeScenario = null;
+    this.activeScenario = DEFAULT_SCENARIO;
     this.activeGymPair = null;
     this.activeDrillPrompt = null;
 
@@ -27,12 +47,14 @@ class ArticulateApp {
     this.init();
   }
 
-  async init() {
+  init() {
     this.renderIcons();
     this.bindEvents();
-    await this.fetchStatusAndCatalog();
-    this.updateVaultBadge();
+    // Instant zero-latency rendering of default scenario
     this.startScenarioSession();
+    this.updateVaultBadge();
+    // Non-blocking background sync of full catalog and server health
+    this.fetchStatusAndCatalog();
   }
 
   renderIcons() {
@@ -129,16 +151,19 @@ class ArticulateApp {
   async fetchStatusAndCatalog() {
     try {
       const [scenRes, statusRes] = await Promise.all([
-        fetch("/api/scenarios"),
-        fetch("/api/status")
+        fetch("/api/scenarios").catch(() => null),
+        fetch("/api/status").catch(() => null)
       ]);
-      if (scenRes.ok) {
+      if (scenRes && scenRes.ok) {
         this.catalog = await scenRes.json();
-        this.activeScenario = this.catalog.roleplayScenarios[0] || null;
-        this.activeGymPair = this.catalog.minimalPairs[0] || null;
-        this.activeDrillPrompt = this.catalog.speakingDrills[0]?.prompts[0] || null;
+        if (this.catalog.roleplayScenarios && this.catalog.roleplayScenarios.length > 0) {
+          this.activeScenario = this.catalog.roleplayScenarios[0];
+          this.renderRoleplayContext();
+        }
+        this.activeGymPair = this.catalog.minimalPairs?.[0] || null;
+        this.activeDrillPrompt = this.catalog.speakingDrills?.[0]?.prompts?.[0] || null;
       }
-      if (statusRes.ok) {
+      if (statusRes && statusRes.ok) {
         const stat = await statusRes.json();
         const badgeText = document.getElementById("system-status-text");
         if (badgeText) {

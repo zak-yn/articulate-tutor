@@ -1,4 +1,4 @@
-const CACHE_NAME = "articulate-v7";
+const CACHE_NAME = "articulate-v8";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -12,10 +12,9 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener("install", (e) => {
+  self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
 });
 
@@ -35,9 +34,17 @@ self.addEventListener("fetch", (e) => {
   if (e.request.url.includes("/api/")) {
     return; // Pass through API requests to network
   }
+
+  // Network-First: Always fetch freshest assets first, seamlessly falling back to cache offline
   e.respondWith(
-    caches.match(e.request).then((res) => {
-      return res || fetch(e.request);
-    })
+    fetch(e.request)
+      .then((res) => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });

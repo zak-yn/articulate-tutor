@@ -85,6 +85,10 @@ AI English Tutor/
 ---
 
 ## 7. Changelog
+- **2026-10-04**: Instant zero-latency scenario initialization & Network-First PWA caching.
+  - Eliminated "Loading Scenario..." hang by providing pre-bundled `DEFAULT_SCENARIO` and executing synchronous initial render before network calls.
+  - Set default HTML titles and status badges directly in `index.html` to eliminate raw loading states.
+  - Switched Service Worker to Network-First strategy with `skipWaiting` and `clients.claim` to prevent stale cache locking.
 - **2026-10-04**: High-concurrency parallel turn pipeline & sub-2-second conversational latency.
   - Converted `/api/turn` execution from sequential (5-7s) to parallel `Promise.all` (Azure Pronunciation Assessment + Gemini Flash concurrent execution), dropping roundtrip latency to ~1.8-2.0s.
   - Decoupled synchronous TTS from `/api/turn`: returns structured pedagogical feedback, word chips, and metrics instantly while client streams Azure Neural Voice in parallel.

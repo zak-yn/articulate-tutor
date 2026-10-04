@@ -38,11 +38,16 @@ OUTPUT JSON SCHEMA:
   "goal_achieved": false
 }`;
 
-const CANDIDATE_MODELS = [
+// Ordered by speed. Duplicates removed so a failing model is never retried twice.
+const CANDIDATE_MODELS = [...new Set([
   process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
-  "gemini-3.8-flash",
-  "gemini-3.5-flash-lite"
-];
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash"
+])];
+
+// Hard ceilings so a stalled upstream call can never freeze a conversational turn.
+const TURN_TIMEOUT_MS = 9000;
+const TRANSCRIBE_TIMEOUT_MS = 8000;
 
 /**
  * Directly transcribes audio using Gemini Flash multimodal capabilities
@@ -60,6 +65,7 @@ export async function transcribeAudioWithGemini(audioBuffer, mimeType = "audio/w
 
     const res = await fetch(url, {
       method: "POST",
+      signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [
@@ -124,12 +130,16 @@ export async function generateTutorTurn({
     userTurn
   ];
 
-  // Try candidate models in order of speed and stability
+  // Try candidate models in order of speed and stability, within a total time budget
+  const deadline = Date.now() + 14000;
   for (const model of CANDIDATE_MODELS) {
+    const remaining = deadline - Date.now();
+    if (remaining < 1500) break;
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: "POST",
+        signal: AbortSignal.timeout(Math.min(TURN_TIMEOUT_MS, remaining)),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents,

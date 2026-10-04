@@ -1,5 +1,7 @@
 // Azure Speech SDK Pronunciation Assessment Adapter (Optional cloud enhancement)
 
+const AZURE_TIMEOUT_MS = 8000;
+
 export async function assessWithAzureSpeech(audioBuffer, referenceText = "") {
   const azureKey = process.env.AZURE_SPEECH_KEY || "";
   const azureRegion = process.env.AZURE_SPEECH_REGION || "japaneast";
@@ -12,9 +14,25 @@ export async function assessWithAzureSpeech(audioBuffer, referenceText = "") {
     const mod = await import("microsoft-cognitiveservices-speech-sdk");
     const speechsdk = mod.default || mod;
 
-    return new Promise((resolve) => {
+    return new Promise((outerResolve) => {
+      let settled = false;
+      let recognizer = null;
+      const resolve = (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        outerResolve(value);
+      };
+      // Hard ceiling: never let a stalled Azure session block the conversation
+      const timer = setTimeout(() => {
+        console.warn(`Azure Speech timed out after ${AZURE_TIMEOUT_MS}ms`);
+        try { recognizer?.close(); } catch (e) {}
+        resolve(null);
+      }, AZURE_TIMEOUT_MS);
+
       try {
         const speechConfig = speechsdk.SpeechConfig.fromSubscription(azureKey, azureRegion);
+        speechConfig.speechRecognitionLanguage = "en-US";
         const pushStream = speechsdk.AudioInputStream.createPushStream();
         pushStream.write(audioBuffer);
         pushStream.close();
@@ -28,12 +46,12 @@ export async function assessWithAzureSpeech(audioBuffer, referenceText = "") {
         );
         pronConfig.enableProsodyAssessment = true;
 
-        const recognizer = new speechsdk.SpeechRecognizer(speechConfig, audioConfig);
+        recognizer = new speechsdk.SpeechRecognizer(speechConfig, audioConfig);
         pronConfig.applyTo(recognizer);
 
         recognizer.recognizeOnceAsync(
           (result) => {
-            recognizer.close();
+            try { recognizer.close(); } catch (e) {}
             if (result.reason === speechsdk.ResultReason.RecognizedSpeech) {
               const pronResult = speechsdk.PronunciationAssessmentResult.fromResult(result);
               let resJson = null;
@@ -82,7 +100,7 @@ export async function assessWithAzureSpeech(audioBuffer, referenceText = "") {
           },
           (err) => {
             console.warn("Azure Speech recognition failed:", err);
-            recognizer.close();
+            try { recognizer.close(); } catch (e) {}
             resolve(null);
           }
         );

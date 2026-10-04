@@ -85,27 +85,17 @@ AI English Tutor/
 ---
 
 ## 7. Changelog
+- **2026-10-04**: Fixed event-loop freeze in phonetics engine & resilient turn error recovery.
+  - Resolved event loop lockup in `approximateWordPhonemes` by properly scoping fallback branch index increments.
+  - Implemented 8s timeout guard for Azure Speech SDK and 14s total deadline for candidate Gemini models.
+  - Parallelized audio fallback transcription pipeline (`assessWithAzureSpeech` + `transcribeAudioWithGemini`).
+  - Added optimistic UI rendering (`.pending-turn`, `.tutor-thinking`) and retry button for failed requests.
+  - Bumped PWA service worker cache version to `articulate-v10`.
 - **2026-10-04**: Instant zero-latency scenario initialization & Network-First PWA caching.
-  - Eliminated "Loading Scenario..." hang by providing pre-bundled `DEFAULT_SCENARIO` and executing synchronous initial render before network calls.
-  - Set default HTML titles and status badges directly in `index.html` to eliminate raw loading states.
-  - Switched Service Worker to Network-First strategy with `skipWaiting` and `clients.claim` to prevent stale cache locking.
+  - Eliminated "Loading Scenario..." hang with pre-bundled `DEFAULT_SCENARIO` and initial render before network calls.
+  - Switched Service Worker to Network-First strategy with `skipWaiting` and `clients.claim`.
 - **2026-10-04**: High-concurrency parallel turn pipeline & sub-2-second conversational latency.
-  - Converted `/api/turn` execution from sequential (5-7s) to parallel `Promise.all` (Azure Pronunciation Assessment + Gemini Flash concurrent execution), dropping roundtrip latency to ~1.8-2.0s.
-  - Decoupled synchronous TTS from `/api/turn`: returns structured pedagogical feedback, word chips, and metrics instantly while client streams Azure Neural Voice in parallel.
-  - Added in-memory LRU audio cache in `server/tts.js` for instant (0ms) replayed speech.
-  - Upgraded PWA state transitions ("Analyzing speech...", "Tutor speaking...") eliminating freezing UI perception.
-- **2026-10-04**: Real acoustic pronunciation assessment, SVG icon restraint, and scenario context briefing.
-  - Upgraded `audioRecorder.js` to capture 16kHz 16-bit mono Linear PCM WAV, enabling Azure Speech SDK acoustic formant parsing.
-  - Fixed `azureSpeech.js` JSON path to extract genuine `PronAssessment` metrics (accuracy, fluency, prosody, completeness, sub-word phonemes) instead of defaulting to 85.
-  - Constrained SVG icons strictly (`.w-3.5`, `.w-4`, `.tutor-label svg`, `.recasting-header svg`) eliminating ballooned icon layouts.
-  - Implemented bilingual Scenario Context Briefing Card (`.scenario-briefing`) detailing Situation, Role, Partner, and Goal.
-  - Calibrated roleplay openings with accessible default scenario (Melbourne Specialty Cafe) and conversational warm-up greetings.
-- **2026-10-03**: Integrated & configured Azure AI Speech F0 service.
-  - Added `microsoft-cognitiveservices-speech-sdk` to backend dependencies.
-  - Activated Azure Pronunciation Assessment API in `japaneast` for sub-word phoneme scoring and prosody diagnostics.
-  - Added Azure Studio Neural Voice (`en-US-AvaMultilingualNeural`) in `server/tts.js` for ultra-natural human cadence.
-  - Synchronized Azure credentials across local `.env` and Render production service.
+  - Parallelized `/api/turn` execution with `Promise.all` and decoupled TTS synthesis.
+- **2026-10-03**: Azure AI Speech F0 service integration and studio neural voice setup.
 - **2026-10-02**: Initial architecture & production deployment.
-  - Deployed GitHub repository: `zak-yn/articulate-tutor`.
-  - Deployed Render Web Service: `articulate-tutor` ([https://articulate-tutor.onrender.com](https://articulate-tutor.onrender.com)).
-  - Built full PWA with 3 training modes, sub-word IPA modal, FSRS memory vault, and dynamic wave visualizer.
+

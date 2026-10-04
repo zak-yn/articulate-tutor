@@ -132,16 +132,17 @@ app.post("/api/turn", upload.single("audio"), async (req, res) => {
       pronunciationData = azurePron || evaluatePronunciation(userTranscript, referenceText, targetPhoneme);
       tutorTurn = geminiTutor;
     } else {
-      // Audio-only fallback: Transcribe speech from audio first
-      if (req.file && req.file.buffer && process.env.AZURE_SPEECH_KEY) {
-        pronunciationData = await assessWithAzureSpeech(req.file.buffer, referenceText);
-        if (pronunciationData && pronunciationData.recognized_text) {
-          userTranscript = pronunciationData.recognized_text;
-        }
-      }
-
-      if (!userTranscript && req.file && req.file.buffer) {
-        userTranscript = await transcribeAudioWithGemini(req.file.buffer, req.file.mimetype || "audio/wav");
+      // Audio-only fallback: run Azure assessment and Gemini transcription in parallel
+      const hasAudio = req.file && req.file.buffer && req.file.buffer.length > 2000;
+      if (hasAudio) {
+        const [azureResult, geminiText] = await Promise.all([
+          process.env.AZURE_SPEECH_KEY
+            ? assessWithAzureSpeech(req.file.buffer, referenceText).catch(() => null)
+            : Promise.resolve(null),
+          transcribeAudioWithGemini(req.file.buffer, req.file.mimetype || "audio/wav").catch(() => "")
+        ]);
+        pronunciationData = azureResult;
+        userTranscript = (azureResult?.recognized_text || geminiText || "").trim();
       }
 
       if (!userTranscript) {

@@ -3,6 +3,9 @@ import { AudioRecorder } from "./audioRecorder.js";
 import { AudioPlayer } from "./audioPlayer.js";
 import { FsrsDatabase } from "./fsrsDb.js";
 
+// Client ceiling for one conversational turn; server-side budgets stay well under this.
+const TURN_TIMEOUT_MS = 25000;
+
 const DEFAULT_SCENARIO = {
   id: "specialty_cafe",
   title: "Artisanal Coffee Roaster & Order Customization",
@@ -490,10 +493,59 @@ class ArticulateApp {
     this.isLoading = false;
   }
 
+  // Immediate visual feedback: user's words + typing indicator before the server answers
+  renderPendingTurn(liveTranscript) {
+    const ws = document.getElementById("chat-workspace");
+    if (!ws) return;
+    const userEl = document.createElement("div");
+    userEl.className = "turn-container pending-turn";
+    userEl.innerHTML = `<div class="user-turn"><p class="user-raw-text">${this.escapeHtml(liveTranscript || "Transcribing your voice…")}</p></div>`;
+    const tutorEl = document.createElement("div");
+    tutorEl.className = "turn-container pending-turn";
+    tutorEl.id = "pending-tutor-turn";
+    tutorEl.innerHTML = `
+      <div class="tutor-turn tutor-thinking" data-testid="tutor-thinking">
+        <span class="thinking-dots"><i></i><i></i><i></i></span>
+        <span class="thinking-label">Replying</span>
+      </div>`;
+    ws.appendChild(userEl);
+    ws.appendChild(tutorEl);
+    ws.scrollTop = ws.scrollHeight;
+  }
+
+  renderTurnError(message) {
+    const ws = document.getElementById("chat-workspace");
+    if (!ws) return;
+    ws.querySelectorAll(".pending-turn").forEach(el => el.remove());
+    const el = document.createElement("div");
+    el.className = "turn-container turn-error-container";
+    el.innerHTML = `
+      <div class="turn-error" data-testid="turn-error">
+        <span>${this.escapeHtml(message)}</span>
+        <button class="btn-turn-retry" id="btn-turn-retry">Retry</button>
+      </div>`;
+    ws.appendChild(el);
+    ws.scrollTop = ws.scrollHeight;
+    el.querySelector("#btn-turn-retry").addEventListener("click", () => {
+      if (this.isLoading || !this.lastSubmission) return;
+      el.remove();
+      const { audioBlob, liveTranscript } = this.lastSubmission;
+      this.isLoading = true;
+      document.getElementById("btn-ptt")?.classList.add("loading");
+      this.processTurn(audioBlob, liveTranscript).finally(() => this.resetPttState());
+    });
+  }
+
+  escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
   async processTurn(audioBlob, liveTranscript) {
+    this.lastSubmission = { audioBlob, liveTranscript };
     const dueItems = this.db.getDueItems(4).map(i => i.word);
     const caption = document.getElementById("ptt-caption");
     if (caption) caption.textContent = "Coaching your reply...";
+    this.renderPendingTurn(liveTranscript);
 
     const formData = new FormData();
     if (audioBlob) {
@@ -508,16 +560,30 @@ class ArticulateApp {
     }))));
     formData.append("due_words", JSON.stringify(dueItems));
 
-    const res = await fetch("/api/turn", {
-      method: "POST",
-      body: formData
-    });
-
-    if (!res.ok) {
-      throw new Error(`Server returned ${res.status}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TURN_TIMEOUT_MS);
+    let data;
+    try {
+      const res = await fetch("/api/turn", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal
+      });
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      data = await res.json();
+    } catch (err) {
+      const timedOut = err.name === "AbortError";
+      console.error("Turn request failed:", err);
+      this.renderTurnError(timedOut
+        ? "The tutor took too long to respond. The server may be waking up — try again."
+        : "Couldn't reach the tutor. Check your connection and try again.");
+      if (caption) caption.textContent = "Reply failed — tap Retry";
+      return;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const data = await res.json();
 
     // 1. Add User Turn to History
     this.history.push({

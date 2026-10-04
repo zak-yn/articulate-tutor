@@ -105,6 +105,7 @@ function approximateWordPhonemes(word, targetPhonemeFilter = null) {
     } else if (two === "ou" || two === "ow") {
       result.push({ phoneme: "aʊ", ipa: "/aʊ/", accuracy: 87 });
       i += 2;
+    } else {
       const char = clean[i];
       let p = char;
       let ipa = `/${char}/`;

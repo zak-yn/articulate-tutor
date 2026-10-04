@@ -155,25 +155,34 @@ class ArticulateApp {
         fetch("/api/status").catch(() => null)
       ]);
       if (scenRes && scenRes.ok) {
-        this.catalog = await scenRes.json();
-        if (this.catalog.roleplayScenarios && this.catalog.roleplayScenarios.length > 0) {
-          this.activeScenario = this.catalog.roleplayScenarios[0];
-          this.renderRoleplayContext();
+        try {
+          const cat = await scenRes.json();
+          if (cat && cat.roleplayScenarios && cat.roleplayScenarios.length > 0) {
+            this.catalog = cat;
+            this.activeScenario = cat.roleplayScenarios[0];
+            this.renderRoleplayContext();
+          }
+          this.activeGymPair = cat?.minimalPairs?.[0] || null;
+          this.activeDrillPrompt = cat?.speakingDrills?.[0]?.prompts?.[0] || null;
+        } catch (err) {
+          console.warn("Catalog JSON parse skipped:", err.message);
         }
-        this.activeGymPair = this.catalog.minimalPairs?.[0] || null;
-        this.activeDrillPrompt = this.catalog.speakingDrills?.[0]?.prompts?.[0] || null;
       }
       if (statusRes && statusRes.ok) {
-        const stat = await statusRes.json();
-        const badgeText = document.getElementById("system-status-text");
-        if (badgeText) {
-          if (stat.azure_speech_configured && stat.gemini_configured) {
-            badgeText.textContent = "Azure & Gemini Active";
-          } else if (stat.azure_speech_configured) {
-            badgeText.textContent = "Azure Speech Active";
-          } else {
-            badgeText.textContent = "Gemini Active";
+        try {
+          const stat = await statusRes.json();
+          const badgeText = document.getElementById("system-status-text");
+          if (badgeText && stat) {
+            if (stat.azure_speech_configured && stat.gemini_configured) {
+              badgeText.textContent = "Azure & Gemini Active";
+            } else if (stat.azure_speech_configured) {
+              badgeText.textContent = "Azure Speech Active";
+            } else {
+              badgeText.textContent = "Gemini Active";
+            }
           }
+        } catch (err) {
+          console.warn("Status JSON parse skipped:", err.message);
         }
       }
     } catch (e) {

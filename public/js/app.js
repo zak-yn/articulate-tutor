@@ -166,6 +166,11 @@ class ArticulateApp {
     const chatWorkspace = document.getElementById("chat-workspace");
     const audioDock = document.getElementById("audio-dock");
     const scaffoldingBar = document.getElementById("scaffolding-bar");
+    const briefingEl = document.getElementById("scenario-briefing");
+
+    if (briefingEl && mode !== "roleplay") {
+      briefingEl.style.display = "none";
+    }
 
     if (mode === "vault") {
       contextBar.style.display = "none";
@@ -211,10 +216,32 @@ class ArticulateApp {
   renderRoleplayContext() {
     const titleEl = document.getElementById("context-title-text");
     const selectorBtn = document.getElementById("context-selector-btn");
+    const briefingEl = document.getElementById("scenario-briefing");
+
     if (this.activeScenario) {
       titleEl.textContent = `${this.activeScenario.title} (${this.activeScenario.level})`;
       selectorBtn.textContent = "Change Scenario";
       selectorBtn.onclick = () => this.showScenarioPicker();
+
+      if (briefingEl) {
+        briefingEl.style.display = "flex";
+        briefingEl.innerHTML = `
+          <div class="briefing-row">
+            <span class="briefing-tag">状況・設定</span>
+            <span class="briefing-text">${this.activeScenario.settingJa || this.activeScenario.context}</span>
+          </div>
+          <div class="briefing-row">
+            <span class="briefing-tag">あなたの役</span>
+            <span class="briefing-text">${this.activeScenario.yourRoleJa || "Conversational Partner"}</span>
+            <span class="briefing-tag" style="margin-left: 10px;">相手</span>
+            <span class="briefing-text">${this.activeScenario.partnerJa || this.activeScenario.persona}</span>
+          </div>
+          <div class="briefing-row">
+            <span class="briefing-tag">ゴール</span>
+            <span class="briefing-goal">${this.activeScenario.goalJa || this.activeScenario.systemGoal}</span>
+          </div>
+        `;
+      }
     }
   }
 

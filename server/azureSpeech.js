@@ -35,24 +35,46 @@ export async function assessWithAzureSpeech(audioBuffer, referenceText = "") {
           (result) => {
             recognizer.close();
             if (result.reason === speechsdk.ResultReason.RecognizedSpeech) {
-              const resJson = JSON.parse(result.properties.getProperty(speechsdk.PropertyId.SpeechServiceResponse_JsonResult));
+              const pronResult = speechsdk.PronunciationAssessmentResult.fromResult(result);
+              let resJson = null;
+              try {
+                const rawJson = result.properties.getProperty(speechsdk.PropertyId.SpeechServiceResponse_JsonResult);
+                if (rawJson) resJson = JSON.parse(rawJson);
+              } catch (e) {}
+
               const nBest = resJson?.NBest?.[0] || {};
+              const pronAssessment = nBest.PronAssessment || {};
+
+              const accuracy = Math.round(pronAssessment.AccuracyScore ?? pronResult?.accuracyScore ?? 0);
+              const fluency = Math.round(pronAssessment.FluencyScore ?? pronResult?.fluencyScore ?? 0);
+              const prosody = Math.round(pronAssessment.ProsodyScore ?? pronResult?.prosodyScore ?? 0);
+              const pronScore = Math.round(pronAssessment.PronScore ?? pronResult?.pronunciationScore ?? ((accuracy + fluency + prosody) / 3));
+
+              const words = (nBest.Words || []).map(w => {
+                const wPron = w.PronAssessment || {};
+                const wAcc = Math.round(wPron.AccuracyScore ?? w.AccuracyScore ?? accuracy);
+                return {
+                  word: w.Word,
+                  accuracy_score: wAcc,
+                  error_type: wPron.ErrorType || "None",
+                  phonemes: (w.Phonemes || []).map(ph => {
+                    const phPron = ph.PronAssessment || {};
+                    return {
+                      phoneme: ph.Phoneme,
+                      ipa: `/${ph.Phoneme}/`,
+                      accuracy: Math.round(phPron.AccuracyScore ?? wAcc)
+                    };
+                  })
+                };
+              });
+
               resolve({
                 recognized_text: result.text,
-                overall_accuracy: nBest.AccuracyScore || 85,
-                fluency_score: nBest.FluencyScore || 85,
-                prosody_score: nBest.ProsodyScore || 85,
-                pronunciation_score: nBest.PronScore || 85,
-                words: (nBest.Words || []).map(w => ({
-                  word: w.Word,
-                  accuracy_score: w.AccuracyScore || 85,
-                  error_type: w.ErrorType || "None",
-                  phonemes: (w.Phonemes || []).map(ph => ({
-                    phoneme: ph.Phoneme,
-                    ipa: `/${ph.Phoneme}/`,
-                    accuracy: ph.AccuracyScore || 85
-                  }))
-                }))
+                overall_accuracy: accuracy,
+                fluency_score: fluency,
+                prosody_score: prosody,
+                pronunciation_score: pronScore,
+                words
               });
             } else {
               resolve(null);

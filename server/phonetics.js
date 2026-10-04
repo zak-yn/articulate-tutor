@@ -105,18 +105,18 @@ function approximateWordPhonemes(word, targetPhonemeFilter = null) {
     } else if (two === "ou" || two === "ow") {
       result.push({ phoneme: "aʊ", ipa: "/aʊ/", accuracy: 87 });
       i += 2;
-    } else {
       const char = clean[i];
       let p = char;
       let ipa = `/${char}/`;
-      let acc = 85 + Math.floor(Math.random() * 12);
-
-      if (char === "r") { p = "ɹ"; ipa = "/ɹ/"; }
-      else if (char === "a") { p = "æ"; ipa = "/æ/"; }
-      else if (char === "e") { p = "ɛ"; ipa = "/ɛ/"; }
-      else if (char === "i") { p = "ɪ"; ipa = "/ɪ/"; }
-      else if (char === "o") { p = "ɒ"; ipa = "/ɒ/"; }
-      else if (char === "u") { p = "ʌ"; ipa = "/ʌ/"; }
+      // Deterministic difficulty calibration for fallback
+      let acc = 88;
+      if (char === "r") { p = "ɹ"; ipa = "/ɹ/"; acc = 78; }
+      else if (char === "l") { acc = 82; }
+      else if (char === "a") { p = "æ"; ipa = "/æ/"; acc = 84; }
+      else if (char === "e") { p = "ɛ"; ipa = "/ɛ/"; acc = 86; }
+      else if (char === "i") { p = "ɪ"; ipa = "/ɪ/"; acc = 80; }
+      else if (char === "o") { p = "ɒ"; ipa = "/ɒ/"; acc = 85; }
+      else if (char === "u") { p = "ʌ"; ipa = "/ʌ/"; acc = 83; }
 
       result.push({ phoneme: p, ipa, accuracy: acc });
       i += 1;

@@ -54,6 +54,65 @@ body {
   flex-direction: column;
 }
 
+/* SVG Icon Sizing & Anti-AI Restraint System */
+svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.w-3, svg.w-3 { width: 12px !important; height: 12px !important; min-width: 12px; }
+.w-3\.5, svg.w-3\.5, .w-3-5, svg.w-3-5 { width: 14px !important; height: 14px !important; min-width: 14px; }
+.w-4, svg.w-4 { width: 16px !important; height: 16px !important; min-width: 16px; }
+.w-5, svg.w-5 { width: 20px !important; height: 20px !important; min-width: 20px; }
+.w-6, svg.w-6 { width: 24px !important; height: 24px !important; min-width: 24px; }
+.h-3, svg.h-3 { height: 12px !important; }
+.h-3\.5, svg.h-3\.5, .h-3-5, svg.h-3-5 { height: 14px !important; }
+.h-4, svg.h-4 { height: 16px !important; }
+.h-5, svg.h-5 { height: 20px !important; }
+.h-6, svg.h-6 { height: 24px !important; }
+
+/* Scenario Briefing & Context Card */
+.scenario-briefing {
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-hairline);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  animation: fadeIn 0.2s ease;
+}
+
+.briefing-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1.45;
+}
+
+.briefing-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-medium);
+  color: var(--accent-amber);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.briefing-text {
+  color: var(--text-secondary);
+}
+
+.briefing-goal {
+  color: var(--text-main);
+  font-weight: 500;
+}
+
 /* App Shell */
 .app-container {
   display: flex;
@@ -343,6 +402,13 @@ body {
   gap: 6px;
 }
 
+.tutor-label svg {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px;
+  max-width: 14px;
+}
+
 .btn-replay-voice {
   background: transparent;
   border: none;
@@ -380,6 +446,13 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.recasting-header svg {
+  width: 13px !important;
+  height: 13px !important;
+  min-width: 13px;
+  max-width: 13px;
 }
 
 .correction-entry {

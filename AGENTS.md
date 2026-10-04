@@ -85,10 +85,12 @@ AI English Tutor/
 ---
 
 ## 7. Changelog
-- **2026-10-04**: Fixed syntax error in client event handler & verified active Azure status.
-  - Closed missing `});` in `keyup` listener within `public/js/app.js` that caused initial script load failure.
-  - Verified local and Render `/api/status` confirming Azure AI Speech & Gemini 3.5 Flash Lite both fully active.
-  - Autonomous Playwright sensory check validated full scenario rendering and "Azure & Gemini Active" badge.
+- **2026-10-04**: Real acoustic pronunciation assessment, SVG icon restraint, and scenario context briefing.
+  - Upgraded `audioRecorder.js` to capture 16kHz 16-bit mono Linear PCM WAV, enabling Azure Speech SDK acoustic formant parsing.
+  - Fixed `azureSpeech.js` JSON path to extract genuine `PronAssessment` metrics (accuracy, fluency, prosody, completeness, sub-word phonemes) instead of defaulting to 85.
+  - Constrained SVG icons strictly (`.w-3.5`, `.w-4`, `.tutor-label svg`, `.recasting-header svg`) eliminating ballooned icon layouts.
+  - Implemented bilingual Scenario Context Briefing Card (`.scenario-briefing`) detailing Situation, Role, Partner, and Goal.
+  - Calibrated roleplay openings with accessible default scenario (Melbourne Specialty Cafe) and conversational warm-up greetings.
 - **2026-10-03**: Integrated & configured Azure AI Speech F0 service.
   - Added `microsoft-cognitiveservices-speech-sdk` to backend dependencies.
   - Activated Azure Pronunciation Assessment API in `japaneast` for sub-word phoneme scoring and prosody diagnostics.
